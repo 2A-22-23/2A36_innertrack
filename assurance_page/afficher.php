@@ -1,29 +1,58 @@
 <?php
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\SMTP;
+use PHPMailer\PHPMailer\Exception;
+
+require_once 'C:/xampp/htdocs/InnerTrack/Front/vendor/autoload.php';
+use Stichoza\GoogleTranslate\GoogleTranslate;
 require 'db.php';
-$id = $_GET['id'];
-$sql = 'SELECT * FROM liste WHERE id=:id';
-$statement = $connection->prepare($sql);
-$statement->execute([':id' => $id ]);
-$person = $statement->fetch(PDO::FETCH_OBJ);
-if (isset ($_POST['name'])  && isset($_POST['mail'])  && isset($_POST['type_assurance'])  && isset($_POST['dateEffet'])  && isset($_POST['dateExpiration']) ) {
-    $name = $_POST['name'];
-    $mail = $_POST['mail'];
-    $type_assurance = $_POST['type_assurance'];
-    $dateEffet = $_POST['dateEffet'];
-    $dateExpiration = $_POST['dateExpiration'];
-  $sql = 'UPDATE liste SET name=:name, mail=:mail, type_assurance=:type_assurance, dateEffet=:dateEffet, dateExpiration=:dateExpiration WHERE id=:id';
+if (isset($_GET['q'])) {
+  $search_query = $_GET['q'];
+  $sql = "SELECT * FROM liste WHERE name LIKE :search_query";
   $statement = $connection->prepare($sql);
-  if ($statement->execute([':name' => $name, ':mail' => $mail, ':type_assurance' => $type_assurance, ':dateEffet' => $dateEffet, ':dateExpiration' => $dateExpiration, ':id' => $id])) {
-    header("Location: afficher.php");
-    var_dump($updated_person);
-  }
-
-  
-
+  $statement->bindValue(':search_query', "%$search_query%");
+} else {
+$sql = 'SELECT * FROM liste';
+$statement = $connection->prepare($sql);
 }
+$statement->execute();
+$people = $statement->fetchAll(PDO::FETCH_OBJ);
+$translator = new Stichoza\GoogleTranslate\GoogleTranslate();
+$translator->setSource('fr')->setTarget('en');
+foreach ($people as $person) {
+    $person->description_en = $translator->translate($person->description);}
+
+    $sql = "SELECT COUNT(*) AS total_count FROM liste";
+    $statement = $connection->prepare($sql);
+    $statement->execute();
+    $result = $statement->fetch(PDO::FETCH_ASSOC);
+    $total_count = $result['total_count'];
+    
+    $sql = "SELECT COUNT(*) AS lecture_count FROM liste WHERE type_assurance = 'une année'";
+    $statement = $connection->prepare($sql);
+    $statement->execute();
+    $result = $statement->fetch(PDO::FETCH_ASSOC);
+    $lecture_count = $result['lecture_count'];
+    $lecture_percentage = round(($lecture_count / $total_count) * 100, 2);
+    
+    $sql = "SELECT COUNT(*) AS peinture_count FROM liste WHERE type_assurance = 'six mois'";
+    $statement = $connection->prepare($sql);
+    $statement->execute();
+    $result = $statement->fetch(PDO::FETCH_ASSOC);
+    $peinture_count = $result['peinture_count'];
+    $peinture_percentage = round(($peinture_count / $total_count) * 100, 2);
+    
+    
 
 
-?>
+
+
+ ?>
+
+
+
+
+
 
 
 
@@ -76,12 +105,7 @@ if (isset ($_POST['name'])  && isset($_POST['mail'])  && isset($_POST['type_assu
       <i class="bi bi-list toggle-sidebar-btn"></i>
     </div><!-- End Logo -->
 
-    <div class="search-bar">
-      <form class="search-form d-flex align-items-center" method="POST" action="#">
-        <input type="text" name="query" placeholder="Search" title="Enter search keyword">
-        <button type="submit" title="Search"><i class="bi bi-search"></i></button>
-      </form>
-    </div><!-- End Search Bar -->
+    <!-- End Search Bar -->
 
     <nav class="header-nav ms-auto">
       <ul class="d-flex align-items-center">
@@ -306,12 +330,13 @@ if (isset ($_POST['name'])  && isset($_POST['mail'])  && isset($_POST['type_assu
         <ul id="tables-nav" class="nav-content collapse show" data-bs-parent="#sidebar-nav">
           <li>
             <a href="afficher.php" class="active">
-            <i class="bi bi-circle"></i><span>Assurance</span>
+              <i class="bi bi-circle"></i><span>Assurance</span>
             </a>
           </li>
           <li>
             <a href="afficherRemboursement.php">
               <i class="bi bi-circle"></i><span>Remboursement</span>
+            </a>
           </li>
         </ul>
       </li><!-- End Tables Nav -->
@@ -352,57 +377,112 @@ if (isset ($_POST['name'])  && isset($_POST['mail'])  && isset($_POST['type_assu
 
   <main id="main" class="main">
 
-    
+    <div class="pagetitle">
+      <h1>Data Tables</h1>
+      
     </div><!-- End Page Title -->
 
     <section class="section">
       <div class="row">
         <div class="col-lg-12">
 
-          
-          <h2>Update Assuranace</h2>
-    </div>
-    <div class="card-body">
-      <?php if(!empty($message)): ?>
-        <div class="alert alert-success">
-          <?= $message; ?>
-        </div>
-      <?php endif; ?>
-      <form method="post">
+          <div class="card">
+            <div class="card-body">
+            <form action="" method="get">
         <div class="form-group">
-          <label for="name">Name</label>
-          <input value="<?= $person->name; ?>" type="text" name="name" id="name" class="form-control">
+          <label for="search_query"></label>
+          <input type="text" class="form-control" id="search_query" placeholder="search for an assurance" name="q" value="<?= $_GET['q'] ?? '' ?>">
         </div>
-        <div class="form-group">
-          <label for="mail">Email</label>
-          <input type="mail" value="<?= $person->mail; ?>" name="mail" id="mail" class="form-control">
-        </div>
-        <div class="form-group">
-        <label for="type_assurance">Type assurance</label>
-          <input value="<?= $person->type_assurance; ?>" type="text" name="type_assurance" id="type_assurance" class="form-control">
-        </div>
-        <div class="form-group">
-        <label for="dateEffet"> dateEffet</label>
-          <input value="<?= $person->dateEffet; ?>" type="date" name="dateEffet" id="dateEffet" class="form-control">
-        </div>
-        <div class="form-group">
-        <label for="dateExpiration">dateExpiration </label>
-          <input value="<?= $person->dateExpiration; ?>" type="date" name="dateExpiration" id="dateExpiration" class="form-control">
-        </div>
-        <div class="form-group">
-          <button type="submit" class="btn btn-info">Update Assurance</button>
-        </div>
+        <br>
+        <center><button type="submit" class="btn btn-primary">Search</button></center>
       </form>
+              <!-- Table with stripped rows -->
+              <table class="table datatable">
+              <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Email</th>
+          <th>TYPE ASSURANCE</th>
+          <th>DATE EFFET </th>
+          <th>DATE EXPIRATION</th>
+          <th>Description</th>
+          <th>Description  translated</th>
+          <th>Action</th>
+        </tr>
+        <?php foreach($people  as $person): ?>
+          <tr>
+            <td><?= $person->id; ?></td>
+            <td><?= $person->name; ?></td>
+            <td><?= $person->mail; ?></td>
+            <td><?= $person->type_assurance; ?></td>
+            <td><?= $person->dateEffet; ?></td>
+            <td><?= $person->dateExpiration; ?></td>
+            <td><?= $person->description; ?></td>
+            <td><?= $person->description_en; ?></td>
+            <td>
+              <a href="edit.php?id=<?= $person->id ?>" class="btn btn-info">Edit</a>
+              <a onclick="return confirm('Are you sure you want to delete this entry?')" href="delete.php?id=<?= $person->id ?>" class='btn btn-danger'>Delete</a>
+            </td>
+          </tr>
+        <?php endforeach; ?>
+      </table>
+      
+      <center><button type="button" class="btn btn-primary" style="background-color; black;" onclick="exportPDF()">Export PDF</button></center><br>
+      <center><button type="button"  ><a class="nav-link" href="create.php">ajouter  </a></boutton>
     </div>
     
+    <center> <h2>Pie chart of type assurance<h2> </center>
+    <canvas id="pie-chart" style="margin-left: 350px;margin-right :300px" ></canvas>
     
+              <!-- End Table with stripped rows -->
+
+            </div>
           
 
   
-<br><br><br><br><br><br>
+
   <!-- ======= Footer ======= -->
-  
-  
+  <footer id="footer" class="footer">
+    <div class="copyright">
+      &copy; Copyright <strong><span>InnerTrack</span></strong>. All Rights Reserved
+    </div>
+    <div class="credits">
+      <!-- All the links in the footer should remain intact. -->
+      <!-- You can delete the links only if you purchased the pro version. -->
+      <!-- Licensing information: https://bootstrapmade.com/license/ -->
+      <!-- Purchase the pro version with working PHP/AJAX contact form: https://bootstrapmade.com/nice-admin-bootstrap-admin-html-template/ -->
+      Designed by <a href="">InnerTrack group</a>
+    </div>
+  </footer><!-- End Footer -->
+  <script src="https://unpkg.com/chart.js@3.7.0/dist/chart.min.js"></script>
+  <script>
+  var ctx = document.getElementById('pie-chart').getContext('2d');
+  var chart = new Chart(ctx, {
+    type: 'pie',
+    data: {
+  labels: ['six moix', 'une année'],
+  datasets: [{
+    label: 'Category',
+    data: [<?= $peinture_percentage ?>, <?= $lecture_percentage ?>],
+    backgroundColor: [
+      'purple',
+      'green'
+    ]
+  }]
+    },
+    options: {
+  title: {
+    display: true,
+    text: 'Category Distribution'
+  },
+  legend: {
+    display: true,
+    position: 'bottom'
+  },
+  fontSize: 16
+}
+  });
+</script>
 
   <!-- Vendor JS Files -->
   <script src="assets/vendor/apexcharts/apexcharts.min.js"></script>
